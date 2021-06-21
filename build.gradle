@@ -1,0 +1,56 @@
+plugins {
+    id 'java'
+    id 'checkstyle'
+    id 'application'
+    id 'com.github.johnrengelman.shadow' version '7.0.0'
+    id 'org.cadixdev.licenser' version '0.6.1'
+}
+
+group 'me.abstraq'
+version '1.0.0'
+
+mainClassName = 'me.abstraq.shinobi.Shinobi'
+
+repositories {
+    mavenCentral()
+    maven {
+        name 'jda-repo'
+        url 'https://m2.dv8tion.net/releases'
+    }
+}
+
+dependencies {
+    implementation 'ch.qos.logback:logback-classic:1.2.3'
+
+    implementation('net.dv8tion:JDA:4.3.0_281') {
+        exclude module: 'opus-java'
+    }
+}
+
+checkstyle {
+    toolVersion '8.43'
+    configFile = file('.checkstyle/checkstyle.xml')
+}
+
+shadowJar {
+    mergeServiceFiles()
+    minimize()
+}
+
+license {
+    header = file('LICENSE_HEADER')
+
+    include '**/*.java'
+
+    skipExistingHeaders true
+
+    properties {
+        project = 'Shinobi'
+        year = 2021
+    }
+}
+
+sourceCompatibility = JavaVersion.VERSION_16
+targetCompatibility = JavaVersion.VERSION_16
+
+compileJava.options.encoding = 'UTF-8'
