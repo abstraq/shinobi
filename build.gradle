@@ -50,7 +50,7 @@ license {
     skipExistingHeaders true
 
     properties {
-        project = 'Shinobi'
+        projectName = 'Shinobi'
         year = 2021
     }
 }
