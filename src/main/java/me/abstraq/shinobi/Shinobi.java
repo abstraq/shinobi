@@ -17,6 +17,7 @@
 
 package me.abstraq.shinobi;
 
+import java.io.Console;
 import javax.security.auth.login.LoginException;
 import me.abstraq.shinobi.commands.CommandDispatcher;
 import net.dv8tion.jda.api.GatewayEncoding;
@@ -70,6 +71,23 @@ public final class Shinobi {
      * @param args arguments passed to the program by the user.
      */
     public static void main(String[] args) {
-        new Shinobi();
+        var client = new Shinobi();
+        Console console = System.console();
+
+        if (console == null) {
+            client.logger.warn("Could not get console, running in non-interactive mode.");
+            return;
+        }
+
+        client.logger.info("Available commands: 'stop'.");
+        while (true) {
+            String command = console.readLine();
+            if (command.equalsIgnoreCase("stop")) {
+                client.logger.info("Received stop command, shutting down the client.");
+                client.api.shutdown();
+                System.exit(0);
+            }
+        }
+
     }
 }
