@@ -18,6 +18,7 @@
 package me.abstraq.shinobi;
 
 import javax.security.auth.login.LoginException;
+import me.abstraq.shinobi.commands.CommandDispatcher;
 import net.dv8tion.jda.api.GatewayEncoding;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
@@ -31,9 +32,11 @@ import org.slf4j.LoggerFactory;
 public final class Shinobi {
     private final Logger logger;
     private final JDA api;
+    private final CommandDispatcher commandDispatcher;
 
-    private Shinobi() {
+    Shinobi() {
         this.logger = LoggerFactory.getLogger(Shinobi.class);
+
         try {
             this.api = JDABuilder.createLight(System.getenv("DISCORD_TOKEN"))
                 .setActivity(Activity.watching("over this server."))
@@ -43,6 +46,22 @@ public final class Shinobi {
             this.logger.error("Error while starting shinobi: {}", e.getMessage());
             throw new RuntimeException(e);
         }
+
+        this.commandDispatcher = new CommandDispatcher(this);
+        this.api.addEventListener(this.commandDispatcher);
+        this.registerCommands();
+    }
+
+    public JDA api() {
+        return this.api;
+    }
+
+    public CommandDispatcher commandDispatcher() {
+        return this.commandDispatcher;
+    }
+
+    private void registerCommands() {
+        // Register commands here.
     }
 
     /**
