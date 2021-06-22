@@ -22,7 +22,6 @@ dependency-reduced-pom.xml
 # Databases #
 #############
 *.db
-*.sql
 *.sqlite
 
 # Packages #

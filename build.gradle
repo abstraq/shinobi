@@ -22,6 +22,12 @@ repositories {
 dependencies {
     implementation 'ch.qos.logback:logback-classic:1.2.3'
 
+    implementation 'com.zaxxer:HikariCP:4.0.3'
+
+    implementation 'org.jdbi:jdbi3-postgres:3.20.1'
+
+    implementation 'org.postgresql:postgresql:42.2.22'
+
     implementation('net.dv8tion:JDA:4.3.0_281') {
         exclude module: 'opus-java'
     }
@@ -34,7 +40,6 @@ checkstyle {
 
 shadowJar {
     mergeServiceFiles()
-    minimize()
 }
 
 license {

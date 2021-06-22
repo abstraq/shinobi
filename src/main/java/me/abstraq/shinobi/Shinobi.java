@@ -20,6 +20,7 @@ package me.abstraq.shinobi;
 import java.io.Console;
 import javax.security.auth.login.LoginException;
 import me.abstraq.shinobi.commands.CommandDispatcher;
+import me.abstraq.shinobi.database.DatabaseProvider;
 import net.dv8tion.jda.api.GatewayEncoding;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
@@ -34,6 +35,7 @@ public final class Shinobi {
     private final Logger logger;
     private final JDA api;
     private final CommandDispatcher commandDispatcher;
+    private final DatabaseProvider databaseProvider;
 
     Shinobi() {
         this.logger = LoggerFactory.getLogger(Shinobi.class);
@@ -47,6 +49,12 @@ public final class Shinobi {
             this.logger.error("Error while starting shinobi: {}", e.getMessage());
             throw new RuntimeException(e);
         }
+        var host = System.getenv("PG_HOST");
+        var username = System.getenv("PG_USER");
+        var password = System.getenv("PG_PASS");
+        var database = System.getenv("PG_DBNAME");
+
+        this.databaseProvider = new DatabaseProvider(host, 5432, username, password, database);
 
         this.commandDispatcher = new CommandDispatcher(this);
         this.api.addEventListener(this.commandDispatcher);
@@ -59,6 +67,10 @@ public final class Shinobi {
 
     public CommandDispatcher commandDispatcher() {
         return this.commandDispatcher;
+    }
+
+    public DatabaseProvider databaseProvider() {
+        return this.databaseProvider;
     }
 
     private void registerCommands() {

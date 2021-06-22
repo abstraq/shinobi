@@ -15,24 +15,25 @@
  * along with Shinobi. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package me.abstraq.shinobi.commands;
-
-import me.abstraq.shinobi.database.model.GuildRecord;
-import net.dv8tion.jda.api.entities.Guild;
-import net.dv8tion.jda.api.entities.Member;
-import net.dv8tion.jda.api.entities.TextChannel;
-import net.dv8tion.jda.api.events.interaction.SlashCommandEvent;
+package me.abstraq.shinobi.database.model;
 
 /**
- * Represents a command in Shinobi.
+ * Represents a guild in the persistent storage.
  */
-public interface Command {
+public record GuildRecord(long id, Long modLogChannelID, Long mutedRoleID, GuildStatus status) {
 
     /**
-     * Callback that is run when the SlashCommandEvent is received and passes all the predicates.
-     *
-     * @param event   context object of the event.
-     * @param guildRecord the record of this
+     * Statuses that the guild may have.
      */
-    void execute(SlashCommandEvent event, GuildRecord guildRecord, Guild guild, TextChannel channel, Member sender);
+    public enum GuildStatus {
+        /**
+         * Shinobi can be used in this guild.
+         */
+        ACTIVE,
+
+        /**
+         * This guiled is barred from using any of Shinobi's features.
+         */
+        DISABLED
+    }
 }

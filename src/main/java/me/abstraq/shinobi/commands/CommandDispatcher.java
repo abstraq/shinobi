@@ -20,6 +20,7 @@ package me.abstraq.shinobi.commands;
 import java.lang.reflect.InvocationTargetException;
 import java.util.HashMap;
 import me.abstraq.shinobi.Shinobi;
+import me.abstraq.shinobi.database.model.GuildRecord;
 import net.dv8tion.jda.api.events.interaction.SlashCommandEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import org.slf4j.Logger;
@@ -52,26 +53,44 @@ public final class CommandDispatcher extends ListenerAdapter {
      */
     @Override
     public void onSlashCommand(SlashCommandEvent event) {
+        var guild = event.getGuild();
+
         // Check if the command is dispatched from a Guild or a DMChannel.
-        if (event.getGuild() == null) {
+        if (guild == null) {
             event.reply("Shinobi commands currently only support guilds.").queue();
             return;
         }
 
-        var id = event.getCommandIdLong();
-        var command = this.storage.get(id);
-        var guildId = event.getGuild().getIdLong();
+        var guildId = guild.getIdLong();
 
-        this.logger.info("Received command {} in guild {}.", id, guildId);
+        // Get the status of the guild the command was used in.
+        this.client.databaseProvider().retrieveGuild(guildId)
+            .thenAccept(guildRecord -> {
+                var record = guildRecord.orElse(new GuildRecord(guildId, null, null, GuildRecord.GuildStatus.ACTIVE));
 
-        // Check if shinobi contains an implementation for the requested command.
-        if (command == null) {
-            this.logger.warn("Command {} is missing an implementation.", id);
-            event.reply("This command is not yet implemented.").setEphemeral(true).queue();
-            return;
-        }
+                var commandID = event.getCommandIdLong();
 
-        command.execute(event, event.getGuild(), event.getTextChannel(), event.getMember());
+                // Don't run command if the guild is disabled.
+                if (record.status() == GuildRecord.GuildStatus.DISABLED) {
+                    this.logger.info("Received command {} in disabled guild {}.", commandID, guildId);
+                    event.reply("Shinobi is disabled in this guild. Contact Shinobi support if you believe this is an error.")
+                        .setEphemeral(true)
+                        .queue();
+                    return;
+                }
+
+                this.logger.info("Received command {} in guild {}.", commandID, guildId);
+                var command = this.storage.get(commandID);
+
+                // Check if shinobi contains an implementation for the requested command.
+                if (command == null) {
+                    this.logger.warn("Command {} is missing an implementation.", commandID);
+                    event.reply("This command is not yet implemented.").setEphemeral(true).queue();
+                    return;
+                }
+
+                command.execute(event, record, guild, event.getTextChannel(), event.getMember());
+            });
     }
 
     /**
@@ -91,7 +110,7 @@ public final class CommandDispatcher extends ListenerAdapter {
         }
     }
 
-    protected Logger logger() {
+    Logger logger() {
         return this.logger;
     }
 }
