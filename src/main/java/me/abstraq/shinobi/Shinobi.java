@@ -25,13 +25,16 @@ import net.dv8tion.jda.api.GatewayEncoding;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.entities.Activity;
+import net.dv8tion.jda.api.events.ReadyEvent;
+import net.dv8tion.jda.api.hooks.ListenerAdapter;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Main class for Shinobi.
  */
-public final class Shinobi {
+public final class Shinobi extends ListenerAdapter {
     private final Logger logger;
     private final JDA api;
     private final CommandDispatcher commandDispatcher;
@@ -49,6 +52,9 @@ public final class Shinobi {
             this.logger.error("Error while starting shinobi: {}", e.getMessage());
             throw new RuntimeException(e);
         }
+
+        this.api().addEventListener(this);
+
         var host = System.getenv("PG_HOST");
         var username = System.getenv("PG_USER");
         var password = System.getenv("PG_PASS");
@@ -57,8 +63,13 @@ public final class Shinobi {
         this.databaseProvider = new DatabaseProvider(host, 5432, username, password, database);
 
         this.commandDispatcher = new CommandDispatcher(this);
-        this.api.addEventListener(this.commandDispatcher);
+        this.api().addEventListener(this.commandDispatcher);
         this.registerCommands();
+    }
+
+    @Override
+    public void onReady(@NotNull ReadyEvent event) {
+        this.logger.info("Shinobi initialization complete, ready to serve.");
     }
 
     public JDA api() {
