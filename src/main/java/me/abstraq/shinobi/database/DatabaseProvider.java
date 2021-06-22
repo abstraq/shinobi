@@ -37,8 +37,12 @@ public class DatabaseProvider {
     private final Logger logger;
     private final Jdbi jdbi;
 
-    static final String INSERT_GUILD = "INSERT INTO shinobi_guilds VALUES (?, ?, ?, ?);";
+    static final String INSERT_GUILD = "INSERT INTO shinobi_guilds (guild_id) VALUES (?);";
     static final String SELECT_GUILD = "SELECT * FROM shinobi_guilds WHERE guild_id = ?;";
+    static final String UPDATE_GUILD_MOD_LOG_CHANNEL = "UPDATE shinobi_guilds SET mod_log_channel_id = ? WHERE guild_id = ?;";
+    static final String UPDATE_GUILD_MUTED_ROLE = "UPDATE shinobi_guilds SET muted_role_id = ? WHERE guild_id = ?;";
+    static final String UPDATE_GUILD_STATUS = "UPDATE shinobi_guilds SET status = ? WHERE guild_id = ?;";
+    static final String DELETE_GUILD = "DELETE FROM shinobi_guilds WHERE guild_id = ?;";
 
     /**
      * Constructor for DatabaseProvider.
@@ -75,17 +79,14 @@ public class DatabaseProvider {
     }
 
     /**
-     * Saves a guild record to the database.
+     * Creates a new guild record in the database.
      *
-     * @param guildRecord record of the guild to save.
+     * @param guildID id of the guild to save.
      * @return CompletableFuture indicating the task was completed.
      */
-    public CompletableFuture<Void> createGuild(GuildRecord guildRecord) {
+    public CompletableFuture<Void> createGuild(long guildID) {
         return CompletableFuture.runAsync(() -> this.jdbi.useHandle(handle -> handle.createUpdate(INSERT_GUILD)
-            .bind(0, guildRecord.id())
-            .bind(1, guildRecord.modLogChannelID())
-            .bind(2, guildRecord.mutedRoleID())
-            .bind(3, guildRecord.status().ordinal())
+            .bind(0, guildID)
             .execute()
         ));
     }
@@ -101,6 +102,64 @@ public class DatabaseProvider {
             .bind(0, guildID)
             .mapTo(GuildRecord.class)
             .findOne()
+        ));
+    }
+
+    /**
+     * Updates the guild record mod log channel id in the database.
+     *
+     * @param guildID         id of the guild to update.
+     * @param modLogChannelID new mod log channel id.
+     * @return CompletableFuture indicating the task was completed.
+     */
+    public CompletableFuture<Void> updateGuildModLogChannel(long guildID, long modLogChannelID) {
+        return CompletableFuture.runAsync(() -> this.jdbi.useHandle(handle -> handle.createUpdate(UPDATE_GUILD_MOD_LOG_CHANNEL)
+            .bind(0, modLogChannelID)
+            .bind(1, guildID)
+            .execute()
+        ));
+    }
+
+    /**
+     * Updates the guild record muted role id in the database.
+     *
+     * @param guildID     id of the guild to update.
+     * @param mutedRoleID new muted role id.
+     * @return CompletableFuture indicating the task was completed.
+     */
+    public CompletableFuture<Void> updateGuildMutedRoleID(long guildID, long mutedRoleID) {
+        return CompletableFuture.runAsync(() -> this.jdbi.useHandle(handle -> handle.createUpdate(UPDATE_GUILD_MUTED_ROLE)
+            .bind(0, mutedRoleID)
+            .bind(1, guildID)
+            .execute()
+        ));
+    }
+
+    /**
+     * Updates the guild record status in the database.
+     *
+     * @param guildID id of the guild to update.
+     * @param status  new status.
+     * @return CompletableFuture indicating the task was completed.
+     */
+    public CompletableFuture<Void> updateGuildStatus(long guildID, GuildRecord.GuildStatus status) {
+        return CompletableFuture.runAsync(() -> this.jdbi.useHandle(handle -> handle.createUpdate(UPDATE_GUILD_STATUS)
+            .bind(0, status.ordinal())
+            .bind(1, guildID)
+            .execute()
+        ));
+    }
+
+    /**
+     * Deletes guild record from the database.
+     *
+     * @param guildID id of the guild to delete.
+     * @return CompletableFuture indicating the task was completed.
+     */
+    public CompletableFuture<Void> deleteGuild(long guildID) {
+        return CompletableFuture.runAsync(() -> this.jdbi.useHandle(handle -> handle.createUpdate(DELETE_GUILD)
+            .bind(0, guildID)
+            .execute()
         ));
     }
 }

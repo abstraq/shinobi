@@ -1,9 +1,9 @@
 CREATE TABLE IF NOT EXISTS shinobi_guilds
 (
-    guild_id BIGINT PRIMARY KEY NOT NULL,
+    guild_id           BIGINT PRIMARY KEY NOT NULL,
     mod_log_channel_id BIGINT,
-    muted_role_id BIGINT,
-    status   SMALLINT DEFAULT 0
+    muted_role_id      BIGINT,
+    status             SMALLINT DEFAULT 0
 );
 
 CREATE INDEX guild_id_index ON shinobi_guilds (guild_id);
@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS shinobi_cases
     created_at   TIMESTAMP NOT NULL,
     expires_at   TIMESTAMP,
     reference    BIGINT,
-    active       BOOLEAN DEFAULT TRUE
+    active       BOOLEAN DEFAULT TRUE,
+    FOREIGN KEY (guild_id) REFERENCES shinobi_guilds (guild_id) ON DELETE CASCADE
 );
 
 CREATE INDEX case_guild_index ON shinobi_cases (guild_id, target_id, active);
