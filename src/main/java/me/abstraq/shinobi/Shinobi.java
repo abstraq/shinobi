@@ -51,22 +51,22 @@ public final class Shinobi extends ListenerAdapter {
             throw new RuntimeException(e);
         }
 
-        this.api().addEventListener(this);
-
-        var host = System.getenv("PG_HOST");
-        var username = System.getenv("PG_USER");
-        var password = System.getenv("PG_PASS");
-        var database = System.getenv("PG_DBNAME");
-
-        this.databaseProvider = new DatabaseProvider(host, 5432, username, password, database);
-
         this.commandDispatcher = new CommandDispatcher(this);
+        this.databaseProvider = new DatabaseProvider(
+            System.getenv("PG_HOST"),
+            5432,
+            System.getenv("PG_USER"),
+            System.getenv("PG_PASS"),
+            System.getenv("PG_DBNAME")
+        );
+
+        this.api().addEventListener(this);
         this.api().addEventListener(this.commandDispatcher);
-        this.registerCommands();
     }
 
     @Override
     public void onReady(@NotNull ReadyEvent event) {
+        this.registerCommands();
         logger.info("Shinobi initialization complete, ready to serve.");
     }
 
