@@ -66,8 +66,8 @@ public final class CommandDispatcher extends ListenerAdapter {
         // Get the status of the guild the command was used in.
         this.client.databaseProvider().retrieveGuild(guildId)
             .thenApplyAsync(guildRecord -> {
-                if (guildRecord.isPresent()) {
-                    return guildRecord.get();
+                if (guildRecord != null) {
+                    return guildRecord;
                 }
                 this.client.databaseProvider().createGuild(guildId);
                 return new GuildRecord(guildId, null, null, GuildRecord.GuildStatus.ACTIVE);

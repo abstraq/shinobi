@@ -92,16 +92,16 @@ public class DatabaseProvider {
     }
 
     /**
-     * Retrieves a guild record from the database, returns Optional.empty() if the requested record does not exist.
+     * Retrieves a guild record from the database.
      *
      * @param guildID guild id of the record to retrieve.
-     * @return the record, if present.
+     * @return the record, if present. Returns null if the record doesn't exist.
      */
-    public CompletableFuture<Optional<GuildRecord>> retrieveGuild(long guildID) {
+    public CompletableFuture<GuildRecord> retrieveGuild(long guildID) {
         return CompletableFuture.supplyAsync(() -> this.jdbi.withHandle(handle -> handle.createQuery(SELECT_GUILD)
             .bind(0, guildID)
             .mapTo(GuildRecord.class)
-            .findOne()
+            .one()
         ));
     }
 
