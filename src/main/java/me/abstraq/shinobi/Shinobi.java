@@ -35,21 +35,19 @@ import org.slf4j.LoggerFactory;
  * Main class for Shinobi.
  */
 public final class Shinobi extends ListenerAdapter {
-    private final Logger logger;
+    private static final Logger logger = LoggerFactory.getLogger(Shinobi.class);
     private final JDA api;
     private final CommandDispatcher commandDispatcher;
     private final DatabaseProvider databaseProvider;
 
     Shinobi() {
-        this.logger = LoggerFactory.getLogger(Shinobi.class);
-
         try {
             this.api = JDABuilder.createLight(System.getenv("DISCORD_TOKEN"))
                 .setActivity(Activity.watching("over this server."))
                 .setGatewayEncoding(GatewayEncoding.ETF)
                 .build();
         } catch (LoginException e) {
-            this.logger.error("Error while starting shinobi: {}", e.getMessage());
+            logger.error("Error while starting shinobi: {}", e.getMessage());
             throw new RuntimeException(e);
         }
 
@@ -69,7 +67,7 @@ public final class Shinobi extends ListenerAdapter {
 
     @Override
     public void onReady(@NotNull ReadyEvent event) {
-        this.logger.info("Shinobi initialization complete, ready to serve.");
+        logger.info("Shinobi initialization complete, ready to serve.");
     }
 
     public JDA api() {
@@ -94,23 +92,25 @@ public final class Shinobi extends ListenerAdapter {
      * @param args arguments passed to the program by the user.
      */
     public static void main(String[] args) {
-        var client = new Shinobi();
         Console console = System.console();
-
         if (console == null) {
-            client.logger.warn("Could not get console, running in non-interactive mode.");
-            return;
+            logger.warn("Could not get console, starting shinobi in non-interactive mode.");
+        } else {
+            logger.info("Starting shinobi in interactive mode.");
+            logger.info("Available commands: 'stop'.");
         }
 
-        client.logger.info("Available commands: 'stop'.");
+        var client = new Shinobi();
+
         while (true) {
-            String command = console.readLine();
-            if (command.equalsIgnoreCase("stop")) {
-                client.logger.info("Received stop command, shutting down the client.");
-                client.api.shutdown();
-                System.exit(0);
+            if (console != null) {
+                String command = console.readLine();
+                if (command.equalsIgnoreCase("stop")) {
+                    logger.info("Received stop command, shutting down the client.");
+                    client.api.shutdown();
+                    System.exit(0);
+                }
             }
         }
-
     }
 }
