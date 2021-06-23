@@ -21,6 +21,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.HashMap;
 import me.abstraq.shinobi.Shinobi;
 import me.abstraq.shinobi.database.model.GuildRecord;
+import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.events.interaction.SlashCommandEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import org.slf4j.Logger;
@@ -53,7 +55,8 @@ public final class CommandDispatcher extends ListenerAdapter {
      */
     @Override
     public void onSlashCommand(SlashCommandEvent event) {
-        var guild = event.getGuild();
+        long commandID = event.getCommandIdLong();
+        Guild guild = event.getGuild();
 
         // Check if the command is dispatched from a Guild or a DMChannel.
         if (guild == null) {
@@ -61,40 +64,42 @@ public final class CommandDispatcher extends ListenerAdapter {
             return;
         }
 
-        var guildId = guild.getIdLong();
+        long guildID = guild.getIdLong();
 
-        // Get the status of the guild the command was used in.
-        this.client.databaseProvider().retrieveGuild(guildId)
-            .thenApplyAsync(guildRecord -> {
+        Member sender = event.getMember();
+        assert sender != null : "Interaction is missing a member property.";
+
+        this.logger.info("{} triggered interaction {} for command {} in guild {}.", sender.getId(), event.getId(), commandID, guildID);
+
+        Command command = this.storage.get(commandID);
+
+        // Check if shinobi contains an implementation for the requested command.
+        if (command == null) {
+            this.logger.warn("Failed to dispatch command {} in guild {} due to missing implementation.", commandID, guildID);
+            event.reply("This command is not yet implemented.").setEphemeral(true).queue();
+            return;
+        }
+
+        this.client.databaseProvider().retrieveGuild(guildID)
+            .thenApply(guildRecord -> {
                 if (guildRecord != null) {
                     return guildRecord;
                 }
-                this.client.databaseProvider().createGuild(guildId);
-                return new GuildRecord(guildId, null, null, GuildRecord.GuildStatus.ACTIVE);
+                this.client.databaseProvider().createGuild(guildID);
+                return new GuildRecord(guildID, null, null, GuildRecord.GuildStatus.ACTIVE);
             })
             .thenAccept(guildRecord -> {
-                var commandID = event.getCommandIdLong();
-
-                // Don't run command if the guild is disabled.
+                // Don't dispatch command because guild is disabled.
                 if (guildRecord.status() == GuildRecord.GuildStatus.DISABLED) {
-                    this.logger.info("Received command {} in disabled guild {}.", commandID, guildId);
+                    this.logger.info("Failed to dispatch command {} in guild {} due to the guild being disabled.", commandID, guildID);
                     event.reply("Shinobi is disabled in this guild. Contact Shinobi support if you believe this is an error.")
                         .setEphemeral(true)
                         .queue();
                     return;
                 }
 
-                this.logger.info("Received command {} in guild {}.", commandID, guildId);
-                var command = this.storage.get(commandID);
-
-                // Check if shinobi contains an implementation for the requested command.
-                if (command == null) {
-                    this.logger.warn("Command {} is missing an implementation.", commandID);
-                    event.reply("This command is not yet implemented.").setEphemeral(true).queue();
-                    return;
-                }
-
-                command.execute(event, guildRecord, guild, event.getTextChannel(), event.getMember());
+                this.logger.info("Dispatching command {} in guild {}.", commandID, guildID);
+                command.execute(event, guildRecord, guild, event.getTextChannel(), sender);
             });
     }
 
@@ -113,9 +118,5 @@ public final class CommandDispatcher extends ListenerAdapter {
         } catch (InstantiationException | IllegalAccessException | InvocationTargetException e) {
             this.logger.warn("Failed to register command {}: {}", id, e.getMessage());
         }
-    }
-
-    Logger logger() {
-        return this.logger;
     }
 }
