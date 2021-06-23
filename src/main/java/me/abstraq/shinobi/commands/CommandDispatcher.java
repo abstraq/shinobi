@@ -65,13 +65,18 @@ public final class CommandDispatcher extends ListenerAdapter {
 
         // Get the status of the guild the command was used in.
         this.client.databaseProvider().retrieveGuild(guildId)
+            .thenApplyAsync(guildRecord -> {
+                if (guildRecord.isPresent()) {
+                    return guildRecord.get();
+                }
+                this.client.databaseProvider().createGuild(guildId);
+                return new GuildRecord(guildId, null, null, GuildRecord.GuildStatus.ACTIVE);
+            })
             .thenAccept(guildRecord -> {
-                var record = guildRecord.orElse(new GuildRecord(guildId, null, null, GuildRecord.GuildStatus.ACTIVE));
-
                 var commandID = event.getCommandIdLong();
 
                 // Don't run command if the guild is disabled.
-                if (record.status() == GuildRecord.GuildStatus.DISABLED) {
+                if (guildRecord.status() == GuildRecord.GuildStatus.DISABLED) {
                     this.logger.info("Received command {} in disabled guild {}.", commandID, guildId);
                     event.reply("Shinobi is disabled in this guild. Contact Shinobi support if you believe this is an error.")
                         .setEphemeral(true)
@@ -89,7 +94,7 @@ public final class CommandDispatcher extends ListenerAdapter {
                     return;
                 }
 
-                command.execute(event, record, guild, event.getTextChannel(), event.getMember());
+                command.execute(event, guildRecord, guild, event.getTextChannel(), event.getMember());
             });
     }
 
