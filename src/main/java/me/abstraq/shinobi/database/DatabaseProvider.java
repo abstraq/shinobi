@@ -21,6 +21,8 @@ import com.zaxxer.hikari.HikariDataSource;
 import java.sql.SQLException;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import me.abstraq.shinobi.database.model.GuildRecord;
 import org.jdbi.v3.core.Jdbi;
 import org.jdbi.v3.core.statement.SqlLogger;
@@ -34,6 +36,7 @@ import org.slf4j.LoggerFactory;
  * for each of the data models.
  */
 public class DatabaseProvider {
+    private final ExecutorService executorService;
     private final Logger logger;
     private final Jdbi jdbi;
 
@@ -54,6 +57,7 @@ public class DatabaseProvider {
      * @param database database name in the PostgreSQL server.
      */
     public DatabaseProvider(String host, int port, String user, String password, String database) {
+        this.executorService = Executors.newCachedThreadPool();
         this.logger = LoggerFactory.getLogger(DatabaseProvider.class);
 
         var dataSource = new HikariDataSource();
@@ -88,7 +92,7 @@ public class DatabaseProvider {
         return CompletableFuture.runAsync(() -> this.jdbi.useHandle(handle -> handle.createUpdate(INSERT_GUILD)
             .bind(0, guildID)
             .execute()
-        ));
+        ), this.executorService);
     }
 
     /**
@@ -101,8 +105,9 @@ public class DatabaseProvider {
         return CompletableFuture.supplyAsync(() -> this.jdbi.withHandle(handle -> handle.createQuery(SELECT_GUILD)
             .bind(0, guildID)
             .mapTo(GuildRecord.class)
-            .one()
-        ));
+            .findOne()
+            .orElse(null)
+        ), this.executorService);
     }
 
     /**
@@ -117,7 +122,7 @@ public class DatabaseProvider {
             .bind(0, modLogChannelID)
             .bind(1, guildID)
             .execute()
-        ));
+        ), this.executorService);
     }
 
     /**
@@ -132,7 +137,7 @@ public class DatabaseProvider {
             .bind(0, mutedRoleID)
             .bind(1, guildID)
             .execute()
-        ));
+        ), this.executorService);
     }
 
     /**
@@ -147,7 +152,7 @@ public class DatabaseProvider {
             .bind(0, status.ordinal())
             .bind(1, guildID)
             .execute()
-        ));
+        ), this.executorService);
     }
 
     /**
@@ -160,6 +165,6 @@ public class DatabaseProvider {
         return CompletableFuture.runAsync(() -> this.jdbi.useHandle(handle -> handle.createUpdate(DELETE_GUILD)
             .bind(0, guildID)
             .execute()
-        ));
+        ), this.executorService);
     }
 }
