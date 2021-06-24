@@ -19,10 +19,11 @@ package me.abstraq.shinobi.database;
 
 import com.zaxxer.hikari.HikariDataSource;
 import java.sql.SQLException;
-import java.util.Optional;
+import java.time.Instant;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import me.abstraq.shinobi.database.model.CaseRecord;
 import me.abstraq.shinobi.database.model.GuildRecord;
 import org.jdbi.v3.core.Jdbi;
 import org.jdbi.v3.core.statement.SqlLogger;
@@ -46,6 +47,10 @@ public class DatabaseProvider {
     static final String UPDATE_GUILD_MUTED_ROLE = "UPDATE shinobi_guilds SET muted_role_id = ? WHERE guild_id = ?;";
     static final String UPDATE_GUILD_STATUS = "UPDATE shinobi_guilds SET status = ? WHERE guild_id = ?;";
     static final String DELETE_GUILD = "DELETE FROM shinobi_guilds WHERE guild_id = ?;";
+
+    static final String INSERT_CASE = "INSERT INTO shinobi_cases (case_type, guild_id, target_id, moderator_id, reason, created_at, expires_at, reference) VALUES (?, ?, ?, ?, ?, ?, ?, ?);";
+    static final String SELECT_CASE_BY_GUILD_SEQ = "SELECT * FROM (SELECT *, row_number() OVER (PARTITION BY guild_id ORDER BY id) row_num FROM shinobi_cases) AS guild_cases WHERE guild_id = ? AND row_num = ?;";
+    static final String SELECT_SEQ_OF_CASE_IN_GUILD = "SELECT row_num FROM (SELECT id, row_number() OVER (PARTITION BY guild_id ORDER BY id) row_num FROM shinobi_cases) AS guild_cases WHERE id = ?;";
 
     /**
      * Constructor for DatabaseProvider.
@@ -79,6 +84,19 @@ public class DatabaseProvider {
                 var mutedRoleID = rs.getLong("muted_role_id");
                 var status = GuildRecord.GuildStatus.values()[rs.getInt("status")];
                 return new GuildRecord(guildID, modLogChannelID, mutedRoleID, status);
+            })
+            .registerRowMapper(CaseRecord.class, (rs, ctx) -> {
+                var id = rs.getLong("id");
+                var caseType = CaseRecord.CaseType.values()[rs.getInt("case_type")];
+                var guildID = rs.getLong("guild_id");
+                var targetID = rs.getLong("target_id");
+                var moderatorID = rs.getLong("moderator_id");
+                var reason = rs.getString("reason");
+                var createdAt = rs.getTimestamp("created_at").toInstant();
+                var expiresAt = rs.getTimestamp("expires_at") != null ? rs.getTimestamp("expires_at").toInstant() : null;
+                var reference = rs.getLong("reference");
+                var active = rs.getBoolean("active");
+                return new CaseRecord(id, caseType, guildID, targetID, moderatorID, reason, createdAt, expiresAt, reference, active);
             });
     }
 
@@ -165,6 +183,61 @@ public class DatabaseProvider {
         return CompletableFuture.runAsync(() -> this.jdbi.useHandle(handle -> handle.createUpdate(DELETE_GUILD)
             .bind(0, guildID)
             .execute()
+        ), this.executorService);
+    }
+
+    /**
+     * Creates a new case record in the database.
+     *
+     * @param guildID id of the guild to save.
+     * @return CompletableFuture containing the sequence number of the case in the guild.
+     */
+    public CompletableFuture<Long> createCase(CaseRecord.CaseType type, long guildID, long targetID, long moderatorID, String reason, Instant createdAt, Instant expiresAt, Long reference) {
+        return CompletableFuture.supplyAsync(() -> this.jdbi.withHandle(handle -> handle.createUpdate(INSERT_CASE)
+                .bind(0, type.ordinal())
+                .bind(1, guildID)
+                .bind(2, targetID)
+                .bind(3, moderatorID)
+                .bind(4, reason)
+                .bind(5, createdAt)
+                .bind(6, expiresAt)
+                .bind(7, reference)
+                .executeAndReturnGeneratedKeys("id")
+                .mapTo(Long.class)
+                .one()
+            ), this.executorService)
+            .thenComposeAsync(this::retrieveGuildSeqForCase, this.executorService);
+    }
+
+    /**
+     * Retrieves a case record by its sequence number in a guild.
+     *
+     * @param guildID  id of the guild the case is in.
+     * @param guildSeq sequence number of the case in the guild.
+     * @return the record, if present. Returns null if the record doesn't exist.
+     */
+    public CompletableFuture<CaseRecord> retrieveCaseBySeq(long guildID, long guildSeq) {
+        return CompletableFuture.supplyAsync(() -> this.jdbi.withHandle(handle -> handle.createQuery(SELECT_CASE_BY_GUILD_SEQ)
+            .bind(0, guildID)
+            .bind(1, guildSeq)
+            .mapTo(CaseRecord.class)
+            .findOne()
+            .orElse(null)
+        ), this.executorService);
+    }
+
+    /**
+     * Retrieves the sequential number of the case in its guild.
+     *
+     * @param caseID id of the case.
+     * @return the sequence number, if present. Returns null if the record doesn't exist.
+     */
+    public CompletableFuture<Long> retrieveGuildSeqForCase(long caseID) {
+        return CompletableFuture.supplyAsync(() -> this.jdbi.withHandle(handle -> handle.createQuery(SELECT_SEQ_OF_CASE_IN_GUILD)
+            .bind(0, caseID)
+            .mapTo(Long.class)
+            .findOne()
+            .orElse(null)
         ), this.executorService);
     }
 }

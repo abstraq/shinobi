@@ -20,6 +20,7 @@ package me.abstraq.shinobi;
 import java.io.Console;
 import javax.security.auth.login.LoginException;
 import me.abstraq.shinobi.commands.CommandDispatcher;
+import me.abstraq.shinobi.commands.WarnCommand;
 import me.abstraq.shinobi.database.DatabaseProvider;
 import net.dv8tion.jda.api.GatewayEncoding;
 import net.dv8tion.jda.api.JDA;
@@ -83,7 +84,7 @@ public final class Shinobi extends ListenerAdapter {
     }
 
     private void registerCommands() {
-        // Register commands here.
+        this.commandDispatcher().register(856920316927672352L, WarnCommand.class);
     }
 
     /**
