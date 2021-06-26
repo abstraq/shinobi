@@ -20,6 +20,7 @@ package me.abstraq.shinobi.database;
 import com.zaxxer.hikari.HikariDataSource;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.util.List;
 import me.abstraq.shinobi.database.model.CaseRecord;
 import me.abstraq.shinobi.database.model.GuildRecord;
 import org.jdbi.v3.core.Jdbi;
@@ -46,6 +47,7 @@ public class DatabaseProvider {
 
     static final String INSERT_CASE = "INSERT INTO shinobi_cases (case_type, guild_id, target_id, moderator_id, reason, created_at, expires_at, reference) VALUES (?, ?, ?, ?, ?, ?, ?, ?);";
     static final String SELECT_CASE_BY_GUILD_SEQ = "SELECT * FROM (SELECT *, row_number() OVER (PARTITION BY guild_id ORDER BY id) row_num FROM shinobi_cases) AS guild_cases WHERE guild_id = ? AND row_num = ?;";
+    static final String SELECT_CASES_BY_TARGET = "SELECT * FROM shinobi_cases WHERE guild_id = ? AND target_id = ?;";
     static final String SELECT_SEQ_OF_CASE_IN_GUILD = "SELECT row_num FROM (SELECT id, row_number() OVER (PARTITION BY guild_id ORDER BY id) row_num FROM shinobi_cases) AS guild_cases WHERE id = ?;";
 
     /**
@@ -213,6 +215,22 @@ public class DatabaseProvider {
             .mapTo(CaseRecord.class)
             .findOne()
             .orElse(null)
+        );
+    }
+
+    /**
+     * Retrieves a list of cases where the target is the specified user.
+     *
+     * @param guildID  id of the guild the cases are in.
+     * @param targetID id of the user to filter cases by.
+     * @return the list of cases. Returns an empty list if no cases exist.
+     */
+    public List<CaseRecord> retrieveCasesByTarget(long guildID, long targetID) {
+        return this.jdbi.withHandle(handle -> handle.createQuery(SELECT_CASES_BY_TARGET)
+            .bind(0, guildID)
+            .bind(1, targetID)
+            .mapTo(CaseRecord.class)
+            .list()
         );
     }
 

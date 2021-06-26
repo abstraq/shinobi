@@ -20,10 +20,12 @@ package me.abstraq.shinobi;
 import java.io.Console;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import javax.security.auth.login.LoginException;
 import me.abstraq.shinobi.commands.CommandDispatcher;
 import me.abstraq.shinobi.commands.WarnCommand;
 import me.abstraq.shinobi.database.DatabaseProvider;
+import me.abstraq.shinobi.services.PromptService;
 import net.dv8tion.jda.api.GatewayEncoding;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
@@ -43,6 +45,8 @@ public final class Shinobi extends ListenerAdapter {
     private final CommandDispatcher commandDispatcher;
     private final DatabaseProvider databaseProvider;
     private final ExecutorService executorService;
+    private final ScheduledExecutorService schedulerService;
+    private final PromptService promptService;
 
     Shinobi() {
         try {
@@ -56,6 +60,7 @@ public final class Shinobi extends ListenerAdapter {
         }
 
         this.commandDispatcher = new CommandDispatcher(this);
+
         this.databaseProvider = new DatabaseProvider(
             System.getenv("PG_HOST"),
             5432,
@@ -63,10 +68,16 @@ public final class Shinobi extends ListenerAdapter {
             System.getenv("PG_PASS"),
             System.getenv("PG_DBNAME")
         );
+
         this.executorService = Executors.newCachedThreadPool();
+
+        this.schedulerService = Executors.newScheduledThreadPool(10);
+
+        this.promptService = new PromptService();
 
         this.api().addEventListener(this);
         this.api().addEventListener(this.commandDispatcher);
+        this.api().addEventListener(this.promptService);
     }
 
     @Override
@@ -89,6 +100,14 @@ public final class Shinobi extends ListenerAdapter {
 
     public ExecutorService executorService() {
         return this.executorService;
+    }
+
+    public ScheduledExecutorService schedulerService() {
+        return this.schedulerService;
+    }
+
+    public PromptService promptService() {
+        return this.promptService;
     }
 
     private void registerCommands() {
