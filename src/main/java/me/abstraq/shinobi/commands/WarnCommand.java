@@ -96,6 +96,7 @@ public final class WarnCommand implements Command {
             .map(OptionMapping::getAsString)
             .orElse(null);
 
+        // Make sure the reason isn't over 255 characters.
         if (reason != null && reason.length() > 255) {
             event.reply("Your reason must be a max of 255 characters.")
                 .setEphemeral(true)
@@ -107,49 +108,38 @@ public final class WarnCommand implements Command {
             .map(OptionMapping::getAsLong)
             .orElse(null);
 
+        // Check if the case referenced actually exists.
+        if (reference != null) {
+            var referenceCase = this.database.retrieveCaseBySeq(guild.getIdLong(), reference);
+            if (referenceCase == null) {
+                event.reply("The case '" + reference + "' that you tried to reference does not exist.")
+                    .setEphemeral(true)
+                    .queue();
+                return;
+            }
+        }
+
         var guildID = guild.getIdLong();
         var targetID = target.getIdLong();
         var moderatorID = sender.getIdLong();
         var createdAt = Instant.now();
 
-        if (reference != null) {
-            this.database.retrieveCaseBySeq(guildID, reference)
-                .thenApply(referenceCase -> {
-                    if (referenceCase == null) {
-                        throw new RuntimeException("The case '" + reference + "' that you tried to reference does not exist.");
-                    }
-                    return referenceCase;
-                })
-                .thenCompose(referenceCase -> this.database.createCase(CaseRecord.CaseType.WARN, guildID, targetID, moderatorID, reason, createdAt, null, reference))
-                .thenAccept(caseSeq -> {
-                    target.getUser().openPrivateChannel().queue(dm -> {
-                        if (dm != null) {
-                            dm.sendMessageEmbeds(this.dmEmbed(caseSeq, guild, target, sender, reason, createdAt)).queue();
-                        }
-                    });
-                    event.replyEmbeds(this.broadcastEmbed(caseSeq, target, sender, reason, createdAt, reference)).queue();
-                })
-                .exceptionally(ex -> {
-                    event.reply(ex.getCause().getMessage())
-                        .setEphemeral(true)
-                        .queue();
-                    return null;
-                });
-            return;
-        }
+        // Create the case record.
+        var caseSeq = this.database.createCase(CaseRecord.CaseType.WARN, guildID, targetID, moderatorID, reason, createdAt, null, reference);
 
-        this.database.createCase(CaseRecord.CaseType.WARN, guildID, targetID, moderatorID, reason, createdAt, null, null)
-            .thenAccept(caseSeq -> {
-                target.getUser().openPrivateChannel().queue(dm -> {
-                    if (dm != null) {
-                        dm.sendMessageEmbeds(this.dmEmbed(caseSeq, guild, target, sender, reason, createdAt)).queue();
-                    }
-                });
-                event.replyEmbeds(this.broadcastEmbed(caseSeq, target, sender, reason, createdAt, null)).queue();
-            });
+        // Sends a notification to the target's inbox.
+        target.getUser().openPrivateChannel().queue(dm -> {
+            if (dm != null) {
+                dm.sendMessageEmbeds(this.inboxMessage(caseSeq, guild, sender, reason, createdAt)).queue();
+            }
+        });
+
+        // Notify the channel of the action.
+        event.replyEmbeds(this.channelMessage(caseSeq, target, sender, reason, createdAt, reference)).queue();
+
     }
 
-    private MessageEmbed dmEmbed(long caseSeq, Guild guild, Member target, Member moderator, String reason, Instant createdAt) {
+    private MessageEmbed inboxMessage(long caseSeq, Guild guild, Member moderator, String reason, Instant createdAt) {
         String creationTimestamp = String.format("<t:%s:F>", createdAt.getEpochSecond());
         StringBuilder descriptionBuilder = new StringBuilder("You were warned in **")
             .append(guild.getName())
@@ -173,7 +163,7 @@ public final class WarnCommand implements Command {
             .build();
     }
 
-    private MessageEmbed broadcastEmbed(long caseSeq, Member target, Member moderator, String reason, Instant createdAt, Long reference) {
+    private MessageEmbed channelMessage(long caseSeq, Member target, Member moderator, String reason, Instant createdAt, Long reference) {
         String creationTimestamp = String.format("<t:%s:F>", createdAt.getEpochSecond());
         StringBuilder descriptionBuilder = new StringBuilder("**")
             .append(moderator.getUser().getAsTag())

@@ -19,6 +19,7 @@ package me.abstraq.shinobi.commands;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.HashMap;
+import java.util.concurrent.CompletableFuture;
 import me.abstraq.shinobi.Shinobi;
 import me.abstraq.shinobi.database.model.GuildRecord;
 import net.dv8tion.jda.api.entities.Guild;
@@ -80,27 +81,27 @@ public final class CommandDispatcher extends ListenerAdapter {
             return;
         }
 
-        this.client.databaseProvider().retrieveGuild(guildID)
-            .thenApply(guildRecord -> {
-                if (guildRecord != null) {
-                    return guildRecord;
-                }
+        CompletableFuture.runAsync(() -> {
+            // Get the guild record or create it if there is none.
+            GuildRecord guildRecord = this.client.databaseProvider().retrieveGuild(guildID);
+            if (guildRecord == null) {
                 this.client.databaseProvider().createGuild(guildID);
-                return new GuildRecord(guildID, null, null, GuildRecord.GuildStatus.ACTIVE);
-            })
-            .thenAccept(guildRecord -> {
-                // Don't dispatch command because guild is disabled.
-                if (guildRecord.status() == GuildRecord.GuildStatus.DISABLED) {
-                    this.logger.info("Failed to dispatch command {} in guild {} due to the guild being disabled.", commandID, guildID);
-                    event.reply("Shinobi is disabled in this guild. Contact Shinobi support if you believe this is an error.")
-                        .setEphemeral(true)
-                        .queue();
-                    return;
-                }
+                guildRecord = new GuildRecord(guildID, null, null, GuildRecord.GuildStatus.ACTIVE);
+            }
 
-                this.logger.info("Dispatching command {} in guild {}.", commandID, guildID);
-                command.execute(event, guildRecord, guild, event.getTextChannel(), sender);
-            });
+            // Don't dispatch command because guild is disabled.
+            if (guildRecord.status() == GuildRecord.GuildStatus.DISABLED) {
+                this.logger.info("Failed to dispatch command {} in guild {} due to the guild being disabled.", commandID, guildID);
+                event.reply("Shinobi is disabled in this guild. Contact Shinobi support if you believe this is an error.")
+                    .setEphemeral(true)
+                    .queue();
+                return;
+            }
+
+            // Dispatch the command.
+            this.logger.info("Dispatching command {} in guild {}.", commandID, guildID);
+            command.execute(event, guildRecord, guild, event.getTextChannel(), sender);
+        }, this.client.executorService());
     }
 
     /**

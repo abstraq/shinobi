@@ -18,6 +18,8 @@
 package me.abstraq.shinobi;
 
 import java.io.Console;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import javax.security.auth.login.LoginException;
 import me.abstraq.shinobi.commands.CommandDispatcher;
 import me.abstraq.shinobi.commands.WarnCommand;
@@ -40,6 +42,7 @@ public final class Shinobi extends ListenerAdapter {
     private final JDA api;
     private final CommandDispatcher commandDispatcher;
     private final DatabaseProvider databaseProvider;
+    private final ExecutorService executorService;
 
     Shinobi() {
         try {
@@ -60,6 +63,7 @@ public final class Shinobi extends ListenerAdapter {
             System.getenv("PG_PASS"),
             System.getenv("PG_DBNAME")
         );
+        this.executorService = Executors.newCachedThreadPool();
 
         this.api().addEventListener(this);
         this.api().addEventListener(this.commandDispatcher);
@@ -81,6 +85,10 @@ public final class Shinobi extends ListenerAdapter {
 
     public DatabaseProvider databaseProvider() {
         return this.databaseProvider;
+    }
+
+    public ExecutorService executorService() {
+        return this.executorService;
     }
 
     private void registerCommands() {

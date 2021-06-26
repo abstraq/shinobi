@@ -20,9 +20,6 @@ package me.abstraq.shinobi.database;
 import com.zaxxer.hikari.HikariDataSource;
 import java.sql.SQLException;
 import java.time.Instant;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import me.abstraq.shinobi.database.model.CaseRecord;
 import me.abstraq.shinobi.database.model.GuildRecord;
 import org.jdbi.v3.core.Jdbi;
@@ -37,7 +34,6 @@ import org.slf4j.LoggerFactory;
  * for each of the data models.
  */
 public class DatabaseProvider {
-    private final ExecutorService executorService;
     private final Logger logger;
     private final Jdbi jdbi;
 
@@ -62,7 +58,6 @@ public class DatabaseProvider {
      * @param database database name in the PostgreSQL server.
      */
     public DatabaseProvider(String host, int port, String user, String password, String database) {
-        this.executorService = Executors.newCachedThreadPool();
         this.logger = LoggerFactory.getLogger(DatabaseProvider.class);
 
         var dataSource = new HikariDataSource();
@@ -104,13 +99,12 @@ public class DatabaseProvider {
      * Creates a new guild record in the database.
      *
      * @param guildID id of the guild to save.
-     * @return CompletableFuture indicating the task was completed.
      */
-    public CompletableFuture<Void> createGuild(long guildID) {
-        return CompletableFuture.runAsync(() -> this.jdbi.useHandle(handle -> handle.createUpdate(INSERT_GUILD)
+    public void createGuild(long guildID) {
+        this.jdbi.useHandle(handle -> handle.createUpdate(INSERT_GUILD)
             .bind(0, guildID)
             .execute()
-        ), this.executorService);
+        );
     }
 
     /**
@@ -119,13 +113,13 @@ public class DatabaseProvider {
      * @param guildID guild id of the record to retrieve.
      * @return the record, if present. Returns null if the record doesn't exist.
      */
-    public CompletableFuture<GuildRecord> retrieveGuild(long guildID) {
-        return CompletableFuture.supplyAsync(() -> this.jdbi.withHandle(handle -> handle.createQuery(SELECT_GUILD)
+    public GuildRecord retrieveGuild(long guildID) {
+        return this.jdbi.withHandle(handle -> handle.createQuery(SELECT_GUILD)
             .bind(0, guildID)
             .mapTo(GuildRecord.class)
             .findOne()
             .orElse(null)
-        ), this.executorService);
+        );
     }
 
     /**
@@ -133,14 +127,13 @@ public class DatabaseProvider {
      *
      * @param guildID         id of the guild to update.
      * @param modLogChannelID new mod log channel id.
-     * @return CompletableFuture indicating the task was completed.
      */
-    public CompletableFuture<Void> updateGuildModLogChannel(long guildID, long modLogChannelID) {
-        return CompletableFuture.runAsync(() -> this.jdbi.useHandle(handle -> handle.createUpdate(UPDATE_GUILD_MOD_LOG_CHANNEL)
+    public void updateGuildModLogChannel(long guildID, long modLogChannelID) {
+        this.jdbi.useHandle(handle -> handle.createUpdate(UPDATE_GUILD_MOD_LOG_CHANNEL)
             .bind(0, modLogChannelID)
             .bind(1, guildID)
             .execute()
-        ), this.executorService);
+        );
     }
 
     /**
@@ -148,14 +141,13 @@ public class DatabaseProvider {
      *
      * @param guildID     id of the guild to update.
      * @param mutedRoleID new muted role id.
-     * @return CompletableFuture indicating the task was completed.
      */
-    public CompletableFuture<Void> updateGuildMutedRoleID(long guildID, long mutedRoleID) {
-        return CompletableFuture.runAsync(() -> this.jdbi.useHandle(handle -> handle.createUpdate(UPDATE_GUILD_MUTED_ROLE)
+    public void updateGuildMutedRoleID(long guildID, long mutedRoleID) {
+        this.jdbi.useHandle(handle -> handle.createUpdate(UPDATE_GUILD_MUTED_ROLE)
             .bind(0, mutedRoleID)
             .bind(1, guildID)
             .execute()
-        ), this.executorService);
+        );
     }
 
     /**
@@ -163,50 +155,48 @@ public class DatabaseProvider {
      *
      * @param guildID id of the guild to update.
      * @param status  new status.
-     * @return CompletableFuture indicating the task was completed.
      */
-    public CompletableFuture<Void> updateGuildStatus(long guildID, GuildRecord.GuildStatus status) {
-        return CompletableFuture.runAsync(() -> this.jdbi.useHandle(handle -> handle.createUpdate(UPDATE_GUILD_STATUS)
+    public void updateGuildStatus(long guildID, GuildRecord.GuildStatus status) {
+        this.jdbi.useHandle(handle -> handle.createUpdate(UPDATE_GUILD_STATUS)
             .bind(0, status.ordinal())
             .bind(1, guildID)
             .execute()
-        ), this.executorService);
+        );
     }
 
     /**
      * Deletes guild record from the database.
      *
      * @param guildID id of the guild to delete.
-     * @return CompletableFuture indicating the task was completed.
      */
-    public CompletableFuture<Void> deleteGuild(long guildID) {
-        return CompletableFuture.runAsync(() -> this.jdbi.useHandle(handle -> handle.createUpdate(DELETE_GUILD)
+    public void deleteGuild(long guildID) {
+        this.jdbi.useHandle(handle -> handle.createUpdate(DELETE_GUILD)
             .bind(0, guildID)
             .execute()
-        ), this.executorService);
+        );
     }
 
     /**
      * Creates a new case record in the database.
      *
      * @param guildID id of the guild to save.
-     * @return CompletableFuture containing the sequence number of the case in the guild.
+     * @return the sequence number of the case in the guild.
      */
-    public CompletableFuture<Long> createCase(CaseRecord.CaseType type, long guildID, long targetID, long moderatorID, String reason, Instant createdAt, Instant expiresAt, Long reference) {
-        return CompletableFuture.supplyAsync(() -> this.jdbi.withHandle(handle -> handle.createUpdate(INSERT_CASE)
-                .bind(0, type.ordinal())
-                .bind(1, guildID)
-                .bind(2, targetID)
-                .bind(3, moderatorID)
-                .bind(4, reason)
-                .bind(5, createdAt)
-                .bind(6, expiresAt)
-                .bind(7, reference)
-                .executeAndReturnGeneratedKeys("id")
-                .mapTo(Long.class)
-                .one()
-            ), this.executorService)
-            .thenComposeAsync(this::retrieveGuildSeqForCase, this.executorService);
+    public long createCase(CaseRecord.CaseType type, long guildID, long targetID, long moderatorID, String reason, Instant createdAt, Instant expiresAt, Long reference) {
+        var caseID = this.jdbi.withHandle(handle -> handle.createUpdate(INSERT_CASE)
+            .bind(0, type.ordinal())
+            .bind(1, guildID)
+            .bind(2, targetID)
+            .bind(3, moderatorID)
+            .bind(4, reason)
+            .bind(5, createdAt)
+            .bind(6, expiresAt)
+            .bind(7, reference)
+            .executeAndReturnGeneratedKeys("id")
+            .mapTo(Long.class)
+            .one()
+        );
+        return this.retrieveGuildSeqForCase(caseID);
     }
 
     /**
@@ -216,14 +206,14 @@ public class DatabaseProvider {
      * @param guildSeq sequence number of the case in the guild.
      * @return the record, if present. Returns null if the record doesn't exist.
      */
-    public CompletableFuture<CaseRecord> retrieveCaseBySeq(long guildID, long guildSeq) {
-        return CompletableFuture.supplyAsync(() -> this.jdbi.withHandle(handle -> handle.createQuery(SELECT_CASE_BY_GUILD_SEQ)
+    public CaseRecord retrieveCaseBySeq(long guildID, long guildSeq) {
+        return this.jdbi.withHandle(handle -> handle.createQuery(SELECT_CASE_BY_GUILD_SEQ)
             .bind(0, guildID)
             .bind(1, guildSeq)
             .mapTo(CaseRecord.class)
             .findOne()
             .orElse(null)
-        ), this.executorService);
+        );
     }
 
     /**
@@ -232,12 +222,12 @@ public class DatabaseProvider {
      * @param caseID id of the case.
      * @return the sequence number, if present. Returns null if the record doesn't exist.
      */
-    public CompletableFuture<Long> retrieveGuildSeqForCase(long caseID) {
-        return CompletableFuture.supplyAsync(() -> this.jdbi.withHandle(handle -> handle.createQuery(SELECT_SEQ_OF_CASE_IN_GUILD)
+    public long retrieveGuildSeqForCase(long caseID) {
+        return this.jdbi.withHandle(handle -> handle.createQuery(SELECT_SEQ_OF_CASE_IN_GUILD)
             .bind(0, caseID)
             .mapTo(Long.class)
             .findOne()
             .orElse(null)
-        ), this.executorService);
+        );
     }
 }
