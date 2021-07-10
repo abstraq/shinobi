@@ -184,7 +184,7 @@ public class DatabaseProvider {
      * @param guildID id of the guild to save.
      * @return the sequence number of the case in the guild.
      */
-    public long createCase(CaseRecord.CaseType type, long guildID, long targetID, long moderatorID, String reason, Instant createdAt, Instant expiresAt, Long reference) {
+    public CaseRecord createCase(CaseRecord.CaseType type, long guildID, long targetID, long moderatorID, String reason, Instant createdAt, Instant expiresAt, Long reference) {
         var caseID = this.jdbi.withHandle(handle -> handle.createUpdate(INSERT_CASE)
             .bind(0, type.ordinal())
             .bind(1, guildID)
@@ -198,7 +198,8 @@ public class DatabaseProvider {
             .mapTo(Long.class)
             .one()
         );
-        return this.retrieveGuildSeqForCase(caseID);
+        var caseSeq = this.retrieveGuildSeqForCase(caseID);
+        return new CaseRecord(caseSeq, type, guildID, targetID, moderatorID, reason, createdAt, expiresAt, reference, true);
     }
 
     /**
