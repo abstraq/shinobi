@@ -25,7 +25,9 @@ import me.abstraq.shinobi.Shinobi;
 import me.abstraq.shinobi.database.DatabaseProvider;
 import me.abstraq.shinobi.database.model.CaseRecord;
 import me.abstraq.shinobi.database.model.GuildRecord;
+import me.abstraq.shinobi.services.NotificationService;
 import net.dv8tion.jda.api.EmbedBuilder;
+import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.MessageEmbed;
@@ -75,9 +77,9 @@ public final class WarnCommand implements Command {
         // The sender isn't able to action the target.
         if (target == null || !sender.canInteract(target)) {
             event.reply("""
-                    You are unable to perform moderation actions on the target user.
-                    This occurs if the user is not in this guild, or if they have a higher permission hierarchy position than you.
-                    """)
+                You are unable to perform moderation actions on the target user.
+                This occurs if the user is not in this guild, or if they have a higher permission hierarchy position than you.
+                """)
                 .setEphemeral(true)
                 .queue();
             return;
@@ -86,9 +88,9 @@ public final class WarnCommand implements Command {
         // Shinobi isn't able to action the target.
         if (!guild.getSelfMember().canInteract(target)) {
             event.reply("""
-                    Shinobi is unable to perform moderation actions on the target user.
-                    This occurs if the user has a higher permission hierarchy position than Shinobi.
-                    """)
+                Shinobi is unable to perform moderation actions on the target user.
+                This occurs if the user has a higher permission hierarchy position than Shinobi.
+                """)
                 .setEphemeral(true)
                 .queue();
             return;
@@ -106,13 +108,13 @@ public final class WarnCommand implements Command {
         }
 
         OptionMapping referenceOption = event.getOption("reference");
-        Long reference = referenceOption != null ? referenceOption.getAsLong() : null;
+        Long referenceID = referenceOption != null ? referenceOption.getAsLong() : null;
 
         // Check if the case referenced actually exists.
-        if (reference != null) {
-            var referenceCase = database.retrieveCaseBySeq(guild.getIdLong(), reference);
+        if (referenceID != null) {
+            var referenceCase = database.retrieveCaseBySeq(guild.getIdLong(), referenceID);
             if (referenceCase == null) {
-                event.reply("The case '" + reference + "' that you tried to reference does not exist.")
+                event.replyFormat("The case '%s' that you tried to reference does not exist.", referenceID)
                     .setEphemeral(true)
                     .queue();
                 return;
@@ -142,29 +144,49 @@ public final class WarnCommand implements Command {
 
         confirmPromptFuture.thenAccept(hook -> {
             // Create the case record.
-            var caseSeq = database.createCase(CaseRecord.CaseType.WARN, guildID, targetID, moderatorID, reason, createdAt, null, reference);
+            var caseRecord = database.createCase(CaseRecord.CaseType.WARN, guildID, targetID, moderatorID, reason, createdAt, null, referenceID);
 
-            hook.editOriginalFormat("Successfully warned %s.\nCase #%s", target.getUser().getAsTag(), caseSeq)
+            // Notify the target user in dms.
+            target.getUser().openPrivateChannel().queue(privateChannel -> {
+                if (privateChannel != null) {
+                    NotificationService.publishPrivateMessage(caseRecord, privateChannel, guild, sender);
+                }
+            });
+
+            // Notify the mod log channel if it exists.
+            if (guildRecord.modLogChannelID() != null) {
+                TextChannel modLogChannel = guild.getTextChannelById(guildRecord.modLogChannelID());
+                if (modLogChannel != null) {
+                    boolean canEmbed = modLogChannel.canTalk() && guild.getSelfMember().hasPermission(modLogChannel, Permission.MESSAGE_EMBED_LINKS);
+                    if (canEmbed) {
+                        NotificationService.publishModLog(caseRecord, modLogChannel, target, sender);
+                    }
+                }
+            }
+
+            // Notify the current channel if notifications aren't suppressed.
+            OptionMapping silentOption = event.getOption("silent");
+            boolean silent = silentOption != null && silentOption.getAsBoolean();
+            boolean canEmbed = channel.canTalk() && guild.getSelfMember().hasPermission(channel, Permission.MESSAGE_EMBED_LINKS);
+            if (!silent && canEmbed) {
+                NotificationService.publishChannelBroadcast(caseRecord, channel, target, sender);
+            }
+
+            // Send moderator a success notification.
+            var successNotification = new StringBuilder("Successfully warned ")
+                .append(target.getUser().getAsTag())
+                .append(" [Case #")
+                .append(caseRecord.id())
+                .append("].");
+
+            if (!canEmbed) {
+                successNotification.append("\nCould not notify current channel because I can not send embeds here.");
+            }
+            hook.editOriginal(successNotification.toString())
                 .setActionRows(Collections.emptyList())
                 .queue();
             this.client.promptService().deletePrompt(cancelPromptID);
             this.client.promptService().deletePrompt(confirmPromptID);
-
-            // Sends a notification to the target's inbox.
-            target.getUser().openPrivateChannel().queue(dm -> {
-                if (dm != null) {
-                    dm.sendMessageEmbeds(this.inboxMessage(caseSeq, guild, sender, reason, createdAt)).queue();
-                }
-            });
-
-            OptionMapping silentOption = event.getOption("silent");
-            boolean silent = silentOption != null && silentOption.getAsBoolean();
-
-            // Notify the channel of the action.
-            if (!silent) {
-                // TODO: Looks like a reply to a deleted message. Maybe send a channel message instead of using the hook?
-                hook.sendMessageEmbeds(this.channelMessage(caseSeq, target, sender, reason, createdAt, reference)).queue();
-            }
         });
 
         List<CaseRecord> previousCases = database.retrieveCasesByTarget(guildID, targetID);
@@ -180,7 +202,7 @@ public final class WarnCommand implements Command {
         MessageEmbed embed = new EmbedBuilder()
             .setAuthor(String.format("Are you sure you want to warn %s (%s)?", targetTag, targetID), null, target.getUser().getEffectiveAvatarUrl())
             .setColor(13091884)
-            .setDescription("This action will warn **" + targetTag + "**" + (reason != null ? " for **" + reason + "**" : "") + (reference != null ? " referencing case #**" + reference + "**." : "."))
+            .setDescription("This action will warn **" + targetTag + "**" + (reason != null ? " for **" + reason + "**" : "") + (referenceID != null ? " referencing case #**" + referenceID + "**." : "."))
             .setFooter(warns + " warns.")
             .build();
 
@@ -200,60 +222,5 @@ public final class WarnCommand implements Command {
                 this.client.promptService().deletePrompt(confirmPromptID);
             }
         }, 15L, TimeUnit.SECONDS);
-    }
-
-    private MessageEmbed inboxMessage(long caseSeq, Guild guild, Member moderator, String reason, Instant createdAt) {
-        String creationTimestamp = String.format("<t:%s:F>", createdAt.getEpochSecond());
-        StringBuilder descriptionBuilder = new StringBuilder("You were warned in **")
-            .append(guild.getName())
-            .append("** by **")
-            .append(moderator.getUser().getAsTag())
-            .append("** on ")
-            .append(creationTimestamp);
-
-        if (reason != null) {
-            descriptionBuilder
-                .append(" for **")
-                .append(reason)
-                .append("**");
-        }
-        descriptionBuilder.append(".");
-        return new EmbedBuilder()
-            .setColor(0x2F3136)
-            .setAuthor(guild.getName(), null, guild.getIconUrl())
-            .setDescription(descriptionBuilder)
-            .setFooter("Case #" + caseSeq)
-            .build();
-    }
-
-    private MessageEmbed channelMessage(long caseSeq, Member target, Member moderator, String reason, Instant createdAt, Long reference) {
-        String creationTimestamp = String.format("<t:%s:F>", createdAt.getEpochSecond());
-        StringBuilder descriptionBuilder = new StringBuilder("**")
-            .append(moderator.getUser().getAsTag())
-            .append("** warned **")
-            .append(target.getUser().getAsTag())
-            .append("** on ")
-            .append(creationTimestamp);
-
-        if (reason != null) {
-            descriptionBuilder
-                .append(" for **")
-                .append(reason)
-                .append("**");
-        }
-        if (reference != null) {
-            descriptionBuilder
-                .append(" citing case #")
-                .append(reference)
-                .append(" as a reference");
-        }
-        descriptionBuilder.append(".");
-
-        return new EmbedBuilder()
-            .setColor(0x2F3136)
-            .setAuthor("Warned User")
-            .setDescription(descriptionBuilder)
-            .setFooter("Case #" + caseSeq)
-            .build();
     }
 }
