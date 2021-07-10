@@ -53,6 +53,7 @@ public final class Shinobi extends ListenerAdapter {
             this.api = JDABuilder.createLight(System.getenv("DISCORD_TOKEN"))
                 .setActivity(Activity.watching("over this server."))
                 .setGatewayEncoding(GatewayEncoding.ETF)
+                .addEventListeners(this)
                 .build();
         } catch (LoginException e) {
             logger.error("Error while starting shinobi: {}", e.getMessage());
@@ -75,7 +76,6 @@ public final class Shinobi extends ListenerAdapter {
 
         this.promptService = new PromptService();
 
-        this.api().addEventListener(this);
         this.api().addEventListener(this.commandDispatcher);
         this.api().addEventListener(this.promptService);
     }
