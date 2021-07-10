@@ -83,24 +83,31 @@ public final class CommandDispatcher extends ListenerAdapter {
 
         CompletableFuture.runAsync(() -> {
             // Get the guild record or create it if there is none.
-            GuildRecord guildRecord = this.client.databaseProvider().retrieveGuild(guildID);
-            if (guildRecord == null) {
-                this.client.databaseProvider().createGuild(guildID);
-                guildRecord = new GuildRecord(guildID, null, null, GuildRecord.GuildStatus.ACTIVE);
-            }
+            try {
+                GuildRecord guildRecord = this.client.databaseProvider().retrieveGuild(guildID);
+                if (guildRecord == null) {
+                    this.client.databaseProvider().createGuild(guildID);
+                    guildRecord = new GuildRecord(guildID, null, null, GuildRecord.GuildStatus.ACTIVE);
+                }
 
-            // Don't dispatch command because guild is disabled.
-            if (guildRecord.status() == GuildRecord.GuildStatus.DISABLED) {
-                this.logger.info("Failed to dispatch command {} in guild {} due to the guild being disabled.", commandID, guildID);
-                event.reply("Shinobi is disabled in this guild. Contact Shinobi support if you believe this is an error.")
-                    .setEphemeral(true)
-                    .queue();
-                return;
-            }
+                // Don't dispatch command because guild is disabled.
+                if (guildRecord.status() == GuildRecord.GuildStatus.DISABLED) {
+                    this.logger.info("Failed to dispatch command {} in guild {} due to the guild being disabled.", commandID, guildID);
+                    event.reply("Shinobi is disabled in this guild. Contact Shinobi support if you believe this is an error.")
+                            .setEphemeral(true)
+                            .queue();
+                    return;
+                }
 
-            // Dispatch the command.
-            this.logger.info("Dispatching command {} in guild {}.", commandID, guildID);
-            command.execute(event, guildRecord, guild, event.getTextChannel(), sender);
+                // Dispatch the command.
+                this.logger.info("Dispatching command {} in guild {}.", commandID, guildID);
+                command.execute(event, guildRecord, guild, event.getTextChannel(), sender);
+            } catch (Exception e) {
+                this.logger.error(e.getMessage());
+                event.reply("An error occurred while dispatching this command. Try again later.")
+                        .setEphemeral(true)
+                        .queue();
+            }
         }, this.client.executorService());
     }
 
