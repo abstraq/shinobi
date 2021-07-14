@@ -47,8 +47,6 @@ license {
 
     include '**/*.java'
 
-    skipExistingHeaders true
-
     properties {
         projectName = 'Shinobi'
         year = 2021
