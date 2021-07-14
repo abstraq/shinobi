@@ -17,4 +17,4 @@ The output will be in the `build/libs` directory.
 
 ### License
 
-Shinobi is licensed under the [GPLv3](https://github.com/abstraq/shinobi/blob/master/LICENSE) © [Abstraq Software](https://github.com/abstraq).
+Shinobi is licensed under the [AGPLv3](https://github.com/abstraq/shinobi/blob/master/LICENSE) © [Abstraq Software](https://github.com/abstraq).
