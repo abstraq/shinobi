@@ -43,7 +43,7 @@ shadowJar {
 }
 
 license {
-    header = file('LICENSE_HEADER')
+    header = file('HEADER')
 
     include '**/*.java'
 
