@@ -20,22 +20,22 @@ repositories {
 }
 
 dependencies {
-    implementation 'ch.qos.logback:logback-classic:1.2.3'
+    implementation 'ch.qos.logback:logback-classic:1.2.5'
 
-    implementation 'com.zaxxer:HikariCP:4.0.3'
+    implementation 'com.zaxxer:HikariCP:5.0.0'
 
-    implementation 'org.jdbi:jdbi3-postgres:3.20.1'
+    implementation 'org.jdbi:jdbi3-postgres:3.21.0'
 
-    implementation 'org.postgresql:postgresql:42.2.22'
+    implementation 'org.postgresql:postgresql:42.2.23.jre7'
 
-    implementation('net.dv8tion:JDA:4.3.0_295') {
+    implementation('net.dv8tion:JDA:4.3.0_307') {
         exclude module: 'opus-java'
     }
 }
 
 checkstyle {
-    toolVersion '8.43'
-    configFile = file('.checkstyle/checkstyle.xml')
+    toolVersion '8.44'
+    configFile file('.checkstyle/checkstyle.xml')
 }
 
 shadowJar {
